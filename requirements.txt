@@ -1,3 +1,4 @@
+altair @ file:///work/perseverance-python-buildout/croot/altair_1698866618831/work
 attrs @ file:///work/perseverance-python-buildout/croot/attrs_1698845858439/work
 Babel @ file:///work/perseverance-python-buildout/croot/babel_1698863996602/work
 blinker @ file:///work/perseverance-python-buildout/croot/blinker_1698846408677/work
