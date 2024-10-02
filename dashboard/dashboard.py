@@ -2,9 +2,11 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import os
 
 # Muat data
-data = pd.read_csv("PRSA_Data_Aotizhongxin_20130301-20170228.csv")
+script_dir = os.path.dirname(os.path.realpath(__file__))
+data = pd.read_csv(f"{script_dir}/PRSA_Data_Aotizhongxin_20130301-20170228.csv")
 
 # Cek tipe data
 print("Tipe Data Sebelum Pembersihan:")
