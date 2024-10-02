@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Muat data
-data = pd.read_csv("dashboard/PRSA_Data_Aotizhongxin_20130301-20170228.csv")
+data = pd.read_csv("PRSA_Data_Aotizhongxin_20130301-20170228.csv")
 
 # Cek tipe data
 print("Tipe Data Sebelum Pembersihan:")
