@@ -13,76 +13,78 @@ print("Tipe Data Sebelum Pembersihan:")
 print(data.dtypes)
 
 # Konversi kolom yang seharusnya numerik
-numeric_columns = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3', 'TEMP', 'PRES', 'DEWP', 'RAIN', 'WSPM']
-for col in numeric_columns:
+kolom_polutan = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3']  # Hanya mengambil kolom polutan
+for col in kolom_polutan:
     # Ubah menjadi numerik, buat nilai non-numerik menjadi NaN
     data[col] = pd.to_numeric(data[col], errors='coerce')
 
 # Cek nilai NaN setelah konversi
 print("Jumlah Nilai NaN setelah Pembersihan:")
-print(data[numeric_columns].isna().sum())
+print(data[kolom_polutan].isna().sum())
 
 # Hapus baris yang memiliki nilai NaN di kolom yang relevan
-data.dropna(subset=numeric_columns, inplace=True)
+data.dropna(subset=kolom_polutan, inplace=True)
 
 # Set konfigurasi halaman
-st.set_page_config(page_title="Air Quality Dashboard", layout="wide")
+st.set_page_config(page_title="Dasbor Analisis Kualitas Udara", layout="wide")
 
 # Judul dashboard
-st.title("Air Quality Analysis Dashboard")
+st.title("Dashboard Analisis Kualitas Udara")
 
 # Sidebar untuk filter
-st.sidebar.title("Filter Options")
-selected_month = st.sidebar.selectbox("Select Month", data['month'].unique())
-selected_hour = st.sidebar.selectbox("Select Hour", data['hour'].unique())
+st.sidebar.title("Opsi Filter")
+selected_month = st.sidebar.selectbox("Pilih Bulan", data['month'].unique())
 
-# Filter data berdasarkan bulan dan jam yang dipilih
-filtered_data = data[(data['month'] == selected_month) & (data['hour'] == selected_hour)]
+# Filter hari berdasarkan bulan yang dipilih
+filtered_days = data[data['month'] == selected_month]['day'].unique()
+selected_day = st.sidebar.selectbox("Pilih Hari", filtered_days)
 
-# Tren kualitas udara
-st.subheader("Air Quality Trend in the Selected Month")
-monthly_trend = data[data['month'] == selected_month].groupby('day').mean(numeric_only=True).reset_index()
+# Filter data berdasarkan bulan, hari, dan jam yang dipilih
+filtered_data = data[(data['month'] == selected_month) & (data['day'] == selected_day)]
 
-# Cek jika monthly_trend tidak kosong
-if not monthly_trend.empty:
+# **1. Tren Kualitas Udara di Stasiun Aotizhongxin**
+st.subheader("Tren Kualitas Udara di Bulan yang Dipilih")
+tren_bulanan = data[data['month'] == selected_month].groupby('day').mean(numeric_only=True).reset_index()
+
+if not tren_bulanan.empty:
     fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(monthly_trend['day'], monthly_trend['PM2.5'], label='PM2.5', color='b')
-    ax.plot(monthly_trend['day'], monthly_trend['PM10'], label='PM10', color='g')
-    ax.plot(monthly_trend['day'], monthly_trend['SO2'], label='SO2', color='c')
-    ax.plot(monthly_trend['day'], monthly_trend['NO2'], label='NO2', color='y')
-    ax.plot(monthly_trend['day'], monthly_trend['O3'], label='O3', color='r')
-    ax.set_xlabel("Day of Month")
-    ax.set_ylabel("Pollutant Levels")
-    ax.set_title(f"Air Quality Trend for Month {selected_month}")
+    ax.plot(tren_bulanan['day'], tren_bulanan['PM2.5'], label='PM2.5', color='b')
+    ax.plot(tren_bulanan['day'], tren_bulanan['PM10'], label='PM10', color='g')
+    ax.plot(tren_bulanan['day'], tren_bulanan['SO2'], label='SO2', color='c')
+    ax.plot(tren_bulanan['day'], tren_bulanan['NO2'], label='NO2', color='y')
+    ax.plot(tren_bulanan['day'], tren_bulanan['O3'], label='O3', color='r')
+    ax.set_xlabel("Hari dalam Bulan")
+    ax.set_ylabel("Tingkat Polutan")
+    ax.set_title(f"Tren Kualitas Udara Bulan Ke-{selected_month} di Stasiun Aotizhongxin")
     ax.legend()
     st.pyplot(fig)
 else:
-    st.warning("No data available for the selected month.")
+    st.warning("Tidak ada data untuk bulan yang dipilih.")
 
-# Korelasi antara polutan dan waktu
-st.subheader("Correlation Between Pollutants and Time of Day")
-corr_matrix = data[numeric_columns].corr()  # Hanya kolom numerik
+# **2. Korelasi antara Polutan dan Waktu dalam Sehari (DiDibagi dalam 3 Segmen)**
+st.subheader("Korelasi antara Polutan dan Waktu dalam Sehari (Per 8 Jam)")
 
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.heatmap(corr_matrix[['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3']], annot=True, cmap='coolwarm', ax=ax)
-ax.set_title("Correlation Matrix of Pollutants")
-st.pyplot(fig)
+# Filter data berdasarkan bulan dan hari yang dipilih untuk heatmap
+filtered_data_by_day = data[(data['month'] == selected_month) & (data['day'] == selected_day)]
 
-# Scatter plot polutan
-st.subheader(f"Scatter Plot of Pollutants at Hour {selected_hour}")
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.scatterplot(data=filtered_data, x='hour', y='PM2.5', label='PM2.5', ax=ax, color='blue')
-sns.scatterplot(data=filtered_data, x='hour', y='PM10', label='PM10', ax=ax, color='green')
-sns.scatterplot(data=filtered_data, x='hour', y='SO2', label='SO2', ax=ax, color='cyan')
-sns.scatterplot(data=filtered_data, x='hour', y='NO2', label='NO2', ax=ax, color='yellow')
-sns.scatterplot(data=filtered_data, x='hour', y='O3', label='O3', ax=ax, color='red')
+# Mengelompokkan data berdasarkan jam dan menghitung rata-rata konsentrasi polutan
+rata_rata_per_jam = filtered_data_by_day.groupby('hour').mean(numeric_only=True)
 
-ax.set_xlabel("Hour of Day")
-ax.set_ylabel("Pollutant Levels")
-ax.set_title(f"Pollutants vs Time of Day at Hour {selected_hour}")
-ax.legend()
+# Membuat heatmap per 8 jam
+rentang_waktu = [(0, 7), (8, 15), (16, 23)]  # Membagi hari menjadi 3 bagian masing-masing 8 jam
 
-st.pyplot(fig)
+for start_hour, end_hour in rentang_waktu:
+    st.subheader(f"Heatmap untuk Jam {start_hour}:00 - {end_hour}:59")
 
-# Footer
-st.sidebar.markdown("## Air Quality Data Dashboard © 2024. Albertus Magnus Foresta Noventona")
+    segmen_per_jam = rata_rata_per_jam[(rata_rata_per_jam.index >= start_hour) & (rata_rata_per_jam.index <= end_hour)]
+
+    if not segmen_per_jam.empty:
+        # Visualisasi heatmap
+        fig, ax = plt.subplots(figsize=(10, 6))
+        sns.heatmap(segmen_per_jam[kolom_polutan].T, cmap='coolwarm', annot=True, fmt=".2f", ax=ax)
+        ax.set_title(f'Korelasi antara Konsentrasi Polutan dan Waktu dalam Sehari (Jam {start_hour} - {end_hour})')
+        ax.set_xlabel('Jam dalam Sehari')
+        ax.set_ylabel('Jenis Polutan')
+        st.pyplot(fig)
+    else:
+        st.warning(f"Tidak ada data untuk rentang waktu {start_hour}:00 - {end_hour}:59.")
