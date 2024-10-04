@@ -32,7 +32,7 @@ st.sidebar.title("Opsi Filter")
 
 # ---------------------------------------
 # Filter untuk Visualisasi 1 dan 2 (Perubahan Tingkat Partikel & Variasi Musiman)
-st.sidebar.header("Filter untuk Visualisasi 1 & 2")
+st.sidebar.header("Filter untuk Visualisasi Pertanyaan 1 & 2")
 # Filter tahun dan bulan untuk visualisasi Perubahan Tingkat Partikel dan Variasi Musiman
 selected_year = st.sidebar.selectbox("Pilih Tahun", data.index.year.unique(), index=len(data.index.year.unique())-1)
 selected_start_month = st.sidebar.selectbox("Pilih Bulan Awal (Range 3 Bulan)", data.index.month.unique())
@@ -71,6 +71,34 @@ seasonal_analysis.plot(kind='bar', ax=ax)
 ax.set_title('Rata-rata Tingkat PM2.5 dan PM10 Berdasarkan Musim')
 ax.set_ylabel('Konsentrasi (µg/m³)')
 ax.set_xticklabels(seasonal_analysis.index, rotation=0)
+st.pyplot(fig)
+
+# **2. Hubungan antara Konsentrasi Polutan dan Tingkat Partikel (PM2.5, PM10)**
+st.subheader(f"Hubungan antara Konsentrasi Polutan dan Tingkat Partikel ({selected_year})")
+filtered_data_year = data[data.index.year == selected_year]
+
+fig, axs = plt.subplots(2, 2, figsize=(15, 10))
+sns.scatterplot(data=filtered_data_year, x='PM2.5', y='SO2', ax=axs[0, 0], alpha=0.6)
+axs[0, 0].set_title('Hubungan antara PM2.5 dan SO2')
+axs[0, 0].set_xlabel('PM2.5 (µg/m³)')
+axs[0, 0].set_ylabel('SO2 (µg/m³)')
+
+sns.scatterplot(data=filtered_data_year, x='PM10', y='SO2', ax=axs[0, 1], alpha=0.6)
+axs[0, 1].set_title('Hubungan antara PM10 dan SO2')
+axs[0, 1].set_xlabel('PM10 (µg/m³)')
+axs[0, 1].set_ylabel('SO2 (µg/m³)')
+
+sns.scatterplot(data=filtered_data_year, x='PM2.5', y='NO2', ax=axs[1, 0], alpha=0.6)
+axs[1, 0].set_title('Hubungan antara PM2.5 dan NO2')
+axs[1, 0].set_xlabel('PM2.5 (µg/m³)')
+axs[1, 0].set_ylabel('NO2 (µg/m³)')
+
+sns.scatterplot(data=filtered_data_year, x='PM10', y='NO2', ax=axs[1, 1], alpha=0.6)
+axs[1, 1].set_title('Hubungan antara PM10 dan NO2')
+axs[1, 1].set_xlabel('PM10 (µg/m³)')
+axs[1, 1].set_ylabel('NO2 (µg/m³)')
+
+plt.tight_layout()
 st.pyplot(fig)
 
 # ---------------------------------------
