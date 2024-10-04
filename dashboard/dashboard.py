@@ -2,89 +2,111 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 import os
 
 # Muat data
 script_dir = os.path.dirname(os.path.realpath(__file__))
 data = pd.read_csv(f"{script_dir}/PRSA_Data_Aotizhongxin_20130301-20170228.csv")
 
-# Cek tipe data
-print("Tipe Data Sebelum Pembersihan:")
-print(data.dtypes)
-
 # Konversi kolom yang seharusnya numerik
-kolom_polutan = ['PM2.5', 'PM10', 'SO2', 'NO2', 'CO', 'O3']  # Hanya mengambil kolom polutan
+kolom_polutan = ['SO2', 'NO2', 'CO', 'O3', 'PM2.5', 'PM10']
 for col in kolom_polutan:
-    # Ubah menjadi numerik, buat nilai non-numerik menjadi NaN
     data[col] = pd.to_numeric(data[col], errors='coerce')
-
-# Cek nilai NaN setelah konversi
-print("Jumlah Nilai NaN setelah Pembersihan:")
-print(data[kolom_polutan].isna().sum())
 
 # Hapus baris yang memiliki nilai NaN di kolom yang relevan
 data.dropna(subset=kolom_polutan, inplace=True)
+
+# Konversi waktu ke datetime
+data['datetime'] = pd.to_datetime(data[['year', 'month', 'day', 'hour']])
+data.set_index('datetime', inplace=True)
 
 # Set konfigurasi halaman
 st.set_page_config(page_title="Dasbor Analisis Kualitas Udara", layout="wide")
 
 # Judul dashboard
-st.title("Dashboard Analisis Kualitas Udara")
+st.title("Dashboard Analisis Kualitas Udara di Stasiun Aotizhongxin")
 
 # Sidebar untuk filter
 st.sidebar.title("Opsi Filter")
-selected_month = st.sidebar.selectbox("Pilih Bulan", data['month'].unique())
 
-# Filter hari berdasarkan bulan yang dipilih
-filtered_days = data[data['month'] == selected_month]['day'].unique()
-selected_day = st.sidebar.selectbox("Pilih Hari", filtered_days)
+# ---------------------------------------
+# Filter untuk Visualisasi 1 dan 2 (Perubahan Tingkat Partikel & Variasi Musiman)
+st.sidebar.header("Filter untuk Visualisasi 1 & 2")
+# Filter tahun dan bulan untuk visualisasi Perubahan Tingkat Partikel dan Variasi Musiman
+selected_year = st.sidebar.selectbox("Pilih Tahun", data.index.year.unique(), index=len(data.index.year.unique())-1)
+selected_start_month = st.sidebar.selectbox("Pilih Bulan Awal (Range 3 Bulan)", data.index.month.unique())
+end_month = (selected_start_month + 2) % 12  # Batas bulan range 3 bulan
+if end_month == 0: 
+    end_month = 12
 
-# Filter data berdasarkan bulan, hari, dan jam yang dipilih
-filtered_data = data[(data['month'] == selected_month) & (data['day'] == selected_day)]
+# Filter data untuk 3 bulan terakhir di tahun terpilih
+start_date = f"{selected_year}-{selected_start_month:02d}-01"
+end_date = f"{selected_year}-{end_month:02d}-28"
+filtered_data_3_months = data[start_date:end_date]
 
-# **1. Tren Kualitas Udara di Stasiun Aotizhongxin**
-st.subheader("Tren Kualitas Udara di Bulan yang Dipilih")
-tren_bulanan = data[data['month'] == selected_month].groupby('day').mean(numeric_only=True).reset_index()
+# **1. Perubahan Tingkat Partikel (PM2.5 dan PM10) dalam Tiga Bulan Terakhir**
+st.subheader(f"Perubahan Tingkat Partikel (PM2.5 dan PM10) dalam Tiga Bulan Terakhir ({selected_year})")
 
-if not tren_bulanan.empty:
-    fig, ax = plt.subplots(figsize=(10, 6))
-    ax.plot(tren_bulanan['day'], tren_bulanan['PM2.5'], label='PM2.5', color='b')
-    ax.plot(tren_bulanan['day'], tren_bulanan['PM10'], label='PM10', color='g')
-    ax.plot(tren_bulanan['day'], tren_bulanan['SO2'], label='SO2', color='c')
-    ax.plot(tren_bulanan['day'], tren_bulanan['NO2'], label='NO2', color='y')
-    ax.plot(tren_bulanan['day'], tren_bulanan['O3'], label='O3', color='r')
-    ax.set_xlabel("Hari dalam Bulan")
-    ax.set_ylabel("Tingkat Polutan")
-    ax.set_title(f"Tren Kualitas Udara Bulan Ke-{selected_month} di Stasiun Aotizhongxin")
-    ax.legend()
+pm_changes = filtered_data_3_months[['PM2.5', 'PM10']].resample('D').mean()
+
+fig, ax = plt.subplots(figsize=(14, 7))
+ax.plot(pm_changes.index, pm_changes['PM2.5'], label='PM2.5', color='blue')
+ax.plot(pm_changes.index, pm_changes['PM10'], label='PM10', color='orange')
+ax.set_title('Tingkat PM2.5 dan PM10 Selama Tiga Bulan Terakhir')
+ax.set_xlabel('Tanggal')
+ax.set_ylabel('Konsentrasi (µg/m³)')
+ax.legend()
+ax.grid()
+st.pyplot(fig)
+
+# **Variasi Musiman antara Musim Panas dan Musim Dingin**
+st.subheader(f"Variasi Musiman antara Musim Panas dan Musim Dingin ({selected_year})")
+data['musim'] = np.where((data.index.month >= 6) & (data.index.month <= 8), 'Musim Panas', 'Musim Dingin')
+filtered_data_year = data[data.index.year == selected_year]
+seasonal_analysis = filtered_data_year.groupby('musim')[['PM2.5', 'PM10']].mean()
+
+fig, ax = plt.subplots(figsize=(8, 6))
+seasonal_analysis.plot(kind='bar', ax=ax)
+ax.set_title('Rata-rata Tingkat PM2.5 dan PM10 Berdasarkan Musim')
+ax.set_ylabel('Konsentrasi (µg/m³)')
+ax.set_xticklabels(seasonal_analysis.index, rotation=0)
+st.pyplot(fig)
+
+# ---------------------------------------
+# Filter untuk Analisa Lanjutan
+st.sidebar.header("Filter untuk Analisa Lanjutan")
+# Checkbox untuk menampilkan atau menyembunyikan analisa lanjutan
+show_advanced_analysis = st.sidebar.checkbox("Tampilkan Analisa Lanjutan", value=True)
+
+if show_advanced_analysis:
+    # Filter tahun, bulan awal, dan jumlah hari untuk analisis lanjutan
+    selected_start_year = st.sidebar.selectbox("Pilih Tahun Awal", data.index.year.unique())
+    selected_start_month_analysis = st.sidebar.selectbox("Pilih Bulan Awal untuk Analisa Lanjutan", data.index.month.unique())
+    selected_num_days = st.sidebar.slider("Pilih Jumlah Hari", min_value=1, max_value=365, value=30)
+
+    # Tentukan tanggal mulai dan akhir
+    start_date_analysis = pd.Timestamp(f"{selected_start_year}-{selected_start_month_analysis:02d}-01")
+    end_date_analysis = start_date_analysis + pd.DateOffset(days=selected_num_days)
+    filtered_data_analysis = data[start_date_analysis:end_date_analysis]
+
+    st.subheader(f"Analisis Lanjutan Runtun Waktu Konsentrasi Polutan ({selected_start_year}-{selected_start_month_analysis:02d})")
+
+    fig, axs = plt.subplots(6, 1, figsize=(18, 12), sharex=True)
+    axs[0].plot(filtered_data_analysis.index, filtered_data_analysis['PM2.5'], label='PM2.5', color='blue')
+    axs[0].set_ylabel('PM2.5 (µg/m³)')
+    axs[1].plot(filtered_data_analysis.index, filtered_data_analysis['PM10'], label='PM10', color='orange')
+    axs[1].set_ylabel('PM10 (µg/m³)')
+    axs[2].plot(filtered_data_analysis.index, filtered_data_analysis['SO2'], label='SO2', color='green')
+    axs[2].set_ylabel('SO2 (µg/m³)')
+    axs[3].plot(filtered_data_analysis.index, filtered_data_analysis['NO2'], label='NO2', color='purple')
+    axs[3].set_ylabel('NO2 (µg/m³)')
+    axs[4].plot(filtered_data_analysis.index, filtered_data_analysis['CO'], label='CO', color='yellow')
+    axs[4].set_ylabel('CO (µg/m³)')
+    axs[5].plot(filtered_data_analysis.index, filtered_data_analysis['O3'], label='O3', color='red')
+    axs[5].set_ylabel('O3 (µg/m³)')
+    axs[5].set_xlabel('Tanggal')
+
+    fig.suptitle(f'Runtun Waktu Konsentrasi Polutan ({selected_start_year})')
+    plt.grid(True)
     st.pyplot(fig)
-else:
-    st.warning("Tidak ada data untuk bulan yang dipilih.")
-
-# **2. Korelasi antara Polutan dan Waktu dalam Sehari (DiDibagi dalam 3 Segmen)**
-st.subheader("Korelasi antara Polutan dan Waktu dalam Sehari (Per 8 Jam)")
-
-# Filter data berdasarkan bulan dan hari yang dipilih untuk heatmap
-filtered_data_by_day = data[(data['month'] == selected_month) & (data['day'] == selected_day)]
-
-# Mengelompokkan data berdasarkan jam dan menghitung rata-rata konsentrasi polutan
-rata_rata_per_jam = filtered_data_by_day.groupby('hour').mean(numeric_only=True)
-
-# Membuat heatmap per 8 jam
-rentang_waktu = [(0, 7), (8, 15), (16, 23)]  # Membagi hari menjadi 3 bagian masing-masing 8 jam
-
-for start_hour, end_hour in rentang_waktu:
-    st.subheader(f"Heatmap untuk Jam {start_hour}:00 - {end_hour}:59")
-
-    segmen_per_jam = rata_rata_per_jam[(rata_rata_per_jam.index >= start_hour) & (rata_rata_per_jam.index <= end_hour)]
-
-    if not segmen_per_jam.empty:
-        # Visualisasi heatmap
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.heatmap(segmen_per_jam[kolom_polutan].T, cmap='coolwarm', annot=True, fmt=".2f", ax=ax)
-        ax.set_title(f'Korelasi antara Konsentrasi Polutan dan Waktu dalam Sehari (Jam {start_hour} - {end_hour})')
-        ax.set_xlabel('Jam dalam Sehari')
-        ax.set_ylabel('Jenis Polutan')
-        st.pyplot(fig)
-    else:
-        st.warning(f"Tidak ada data untuk rentang waktu {start_hour}:00 - {end_hour}:59.")
